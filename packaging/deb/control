@@ -1,9 +1,9 @@
 Package: agentpad
 Version: @VERSION@
-Architecture: all
+Architecture: amd64
 Maintainer: Stephen Mott <stephen@mott.email>
 Installed-Size: @SIZE@
-Depends: python3 (>= 3.10), udev, systemd
+Depends: udev, systemd
 Section: utils
 Priority: optional
 Homepage: https://herdr.dev
