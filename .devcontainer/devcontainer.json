@@ -6,7 +6,7 @@
     "ghcr.io/SrzStephen/devcontainer-features/just:1": {},
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
   },
-  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y shellcheck && cargo install prek --locked && prek install",
+  "postCreateCommand": "apt-get update && apt-get install -y shellcheck && cargo install prek --locked && prek install",
   "customizations": {
     "vscode": {
       "extensions": ["rust-lang.rust-analyzer"]
