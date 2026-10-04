@@ -93,13 +93,7 @@ factory-reset pad is configured without the vendor's app.
 3. It puts the LEDs in per-key colour mode at the pad's own maximum brightness
    (4 of 4). All dimming after that is done in software.
 
-| Slots | Code sent |
-|---|---|
-| keys, pad slots 0–11 | F13–F24 |
-| keys, pad slots 12–15 | shift+F13–F16 |
-| knob 1 press / right / left | shift+F17 / F18 / F19 |
-| knob 2 press / right / left | shift+F20 / F21 / F22 |
-| knob 3 press / right / left | shift+F23 / F24, ctrl+F13 |
+![The code each key and knob sends](docs/codes.svg)
 
 **Reading keys.** Linux's keyboard driver drops F13–F24 from this pad and
 passes through only the shift and ctrl modifiers, so the daemon can't use

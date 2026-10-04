@@ -882,6 +882,132 @@ fn architecture() {
     svg("architecture.svg", 770, 356, &body);
 }
 
+/// The code the pad sends for a slot (see "How it works" in the README):
+/// keys 0-11 send F13-F24, keys 12-15 shift+F13-16, then the knobs'
+/// press / right / left slots continue shift+F17-F24 and end on ctrl+F13.
+fn slot_code(slot: usize) -> String {
+    match slot {
+        0..=11 => format!("F{}", 13 + slot),
+        12..=23 => format!("shift+F{}", 13 + slot - 12),
+        _ => "ctrl+F13".to_string(),
+    }
+}
+
+fn codes() {
+    let mut body = text(
+        "24",
+        "34",
+        "Code each control sends",
+        15,
+        TEXT,
+        "start",
+        "bold",
+    );
+    // Keys: the pad numbers them column by column from the bottom left.
+    let (cw, ch, gap) = (72, KEY, GAP);
+    let grid_w = 4 * cw + 3 * gap;
+    body += &format!(
+        "<rect x='24' y='52' width='{}' height='{}' rx='14' fill='{BODY}'/>",
+        grid_w + 28,
+        4 * ch + 3 * gap + 28
+    );
+    for row in 0..4usize {
+        for col in 0..4usize {
+            let slot = col * 4 + (3 - row);
+            let x = 38 + col as i64 * (cw + gap);
+            let y = 66 + row as i64 * (ch + gap);
+            let edge = if slot >= 12 { MUTED } else { CAP_EDGE };
+            body += &format!(
+                "<rect x='{x}' y='{y}' width='{cw}' height='{ch}' rx='7' fill='{CAP}' stroke='{edge}'/>"
+            );
+            body += &text(
+                &(x + cw / 2).to_string(),
+                &(y + 19).to_string(),
+                &format!("slot {slot}"),
+                10,
+                MUTED,
+                "middle",
+                "normal",
+            );
+            body += &text(
+                &(x + cw / 2).to_string(),
+                &(y + 35).to_string(),
+                &slot_code(slot),
+                12,
+                TEXT,
+                "middle",
+                "bold",
+            );
+        }
+    }
+    body += &text(
+        "24",
+        &(52 + 4 * ch + 3 * gap + 28 + 20).to_string(),
+        "Keys: the pad's own slot numbers, column by column from the bottom left",
+        11,
+        MUTED,
+        "start",
+        "normal",
+    );
+    // Knobs: three slots each, press / right / left.
+    let kx = 24 + grid_w + 28 + 24;
+    let kw = 740 - 24 - kx;
+    for k in 0..3usize {
+        let y = 52 + k as i64 * 96;
+        body += &format!("<rect x='{kx}' y='{y}' width='{kw}' height='88' rx='14' fill='{BODY}'/>");
+        let (cx, cy) = (kx + 44, y + 44);
+        body += &format!(
+            "<circle cx='{cx}' cy='{cy}' r='19' fill='{CAP}' stroke='{CAP_EDGE}' stroke-width='3'/><circle cx='{cx}' cy='{cy}' r='12' fill='{BODY}' stroke='{CAP_EDGE}'/><line x1='{cx}' y1='{}' x2='{cx}' y2='{}' stroke='{MUTED}' stroke-width='2'/>",
+            cy - 12,
+            cy - 5
+        );
+        body += &text(
+            &(cx + 38).to_string(),
+            &(cy + 4).to_string(),
+            &format!("knob {}", k + 1),
+            12,
+            TEXT,
+            "start",
+            "bold",
+        );
+        for (p, (name, icon)) in [("press", "●"), ("right", "↻"), ("left", "↺")]
+            .into_iter()
+            .enumerate()
+        {
+            let ly = y + 28 + p as i64 * 20;
+            let lx = kx + 140;
+            body += &text(
+                &lx.to_string(),
+                &ly.to_string(),
+                icon,
+                13,
+                MUTED,
+                "start",
+                "bold",
+            );
+            body += &text(
+                &(lx + 22).to_string(),
+                &ly.to_string(),
+                name,
+                12,
+                MUTED,
+                "start",
+                "normal",
+            );
+            body += &text(
+                &(lx + 76).to_string(),
+                &ly.to_string(),
+                &slot_code(16 + k * 3 + p),
+                12,
+                TEXT,
+                "start",
+                "bold",
+            );
+        }
+    }
+    svg("codes.svg", 740, 352, &body);
+}
+
 fn main() {
     layout();
     keymap();
@@ -890,6 +1016,7 @@ fn main() {
     modes();
     brightness();
     architecture();
+    codes();
     let mut names: Vec<String> = std::fs::read_dir(docs_dir())
         .expect("read docs/")
         .filter_map(|e| e.ok())
