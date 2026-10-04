@@ -49,8 +49,8 @@ FLASH = 0.5  # seconds per on/off half of the blocked flash
 AGENT_KEYS = 12
 BOTTOM_KEYS = {  # layer -> herdr key names for keys 12-15, None = unmapped
     1: ["1", "2", "3", "esc"],
-    2: ["1", "2", "3", None],
-    3: ["y", "n", "t", None],
+    2: ["1", "2", "3", "esc"],
+    3: ["y", "n", "t", "esc"],
 }
 LAYER_COLORS = {1: (255, 50, 0), 2: (0, 60, 255), 3: (150, 0, 255)}
 LAYER_NAMES = {1: "Claude", 2: "Codex", 3: "Kiro"}  # the agent each layer's keys suit

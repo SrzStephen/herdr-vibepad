@@ -46,8 +46,8 @@ numbered options, confirm with `y` or `n`, or cancel with `esc`.
 | Layer | Mode | Knob press | Colour | Bottom row, left to right |
 |---|---|---|---|---|
 | 1 | Claude | knob 1 | reddish orange | `1` `2` `3` `esc` |
-| 2 | Codex | knob 2 | blue | `1` `2` `3` – |
-| 3 | Kiro | knob 3 | purple | `y` `n` `t` – |
+| 2 | Codex | knob 2 | blue | `1` `2` `3` `esc` |
+| 3 | Kiro | knob 3 | purple | `y` `n` `t` `esc` |
 
 The daemon starts in layer 1.
 
