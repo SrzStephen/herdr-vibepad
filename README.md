@@ -18,6 +18,8 @@ systemd user service `agentpad`.
 | top 3 rows | key N focuses agent N (left to right, top to bottom) |
 | bottom row | typed into the active agent: the keys depend on the layer |
 
+![Keymap: knob turns and presses, agent keys and bottom row](docs/keymap.svg)
+
 ## What the lights mean
 
 ### Agent keys: status

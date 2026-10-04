@@ -341,6 +341,127 @@ fn layout() {
     svg("layout.svg", 760, 428, &body);
 }
 
+/// Every control and what it does: per-knob turn left / turn right / press,
+/// the agent keys, and the bottom row for each layer.
+fn keymap() {
+    let mut body = text("24", "34", "Keymap", 15, TEXT, "start", "bold");
+    let knobs: [[&str; 5]; 3] = [
+        [
+            "previous workspace",
+            "next workspace",
+            "layer 1, Claude mode",
+            "press ×3 within 1 s: agent keys",
+            "toggle focused / all workspaces",
+        ],
+        [
+            "previous agent",
+            "next agent",
+            "layer 2, Codex mode",
+            "agents of the focused workspace",
+            "both turns wrap around",
+        ],
+        [
+            "dimmer (−5%)",
+            "brighter (+5%)",
+            "layer 3, Kiro mode",
+            "brightness 5–100%",
+            "remembered across restarts",
+        ],
+    ];
+    for (n, rows) in knobs.iter().enumerate() {
+        let x = 24 + n as i64 * 244;
+        body += &format!("<rect x='{x}' y='52' width='224' height='196' rx='14' fill='{BODY}'/>");
+        body += &knob(
+            &(x + 112).to_string(),
+            90,
+            &format!("knob {}", n + 1),
+            Some((n + 1) as u8),
+            false,
+        );
+        let lx = (x + 16).to_string();
+        let vx = (x + 52).to_string();
+        for (i, (sym, head)) in [("↺", "left"), ("↻", "right"), ("●", "press")]
+            .iter()
+            .enumerate()
+        {
+            let y = (160 + i as i64 * 20).to_string();
+            body += &text(&lx, &y, sym, 13, MUTED, "start", "bold");
+            body += &text(&vx, &y, &format!("{head}:"), 12, MUTED, "start", "normal");
+            let tx = x + 94;
+            body += &text(&tx.to_string(), &y, rows[i], 12, TEXT, "start", "normal");
+        }
+        body += &text(&lx, "228", rows[3], 11, MUTED, "start", "normal");
+        body += &text(&lx, "242", rows[4], 11, MUTED, "start", "normal");
+    }
+    let state = example_agents();
+    let mut colors = led_colors(&state, 1, 100, false);
+    for c in colors.iter_mut().take(12) {
+        *c = (0, 0, 0);
+    }
+    let labels_owned: Vec<String> = (1..=12)
+        .map(|n: i32| n.to_string())
+        .chain(["1", "2", "3", "esc"].into_iter().map(String::from))
+        .collect();
+    let labels: Vec<&str> = labels_owned.iter().map(|s| s.as_str()).collect();
+    let (pad_svg, w, _h) = pad(24, 272, &colors, &labels, &HashSet::new(), false, 1);
+    body += &pad_svg;
+    let tx = 24 + w + 32;
+    body += &text(
+        &tx.to_string(),
+        "302",
+        "Keys 1–12 (top three rows)",
+        13,
+        TEXT,
+        "start",
+        "bold",
+    );
+    body += &text(
+        &tx.to_string(),
+        "322",
+        "press: focus that agent, counting left to right,",
+        12,
+        MUTED,
+        "start",
+        "normal",
+    );
+    body += &text(
+        &tx.to_string(),
+        "338",
+        "top to bottom; colour shows its status",
+        12,
+        MUTED,
+        "start",
+        "normal",
+    );
+    body += &text(
+        &tx.to_string(),
+        "380",
+        "Bottom row: typed into the active agent",
+        13,
+        TEXT,
+        "start",
+        "bold",
+    );
+    for layer in 1..=3u8 {
+        let y = 394 + (layer as i64 - 1) * 36;
+        body += &pill(tx, y, &format!("{} mode", layer_name(layer)), layer);
+        for (i, k) in bottom_keys(layer).iter().enumerate() {
+            let cx = tx + 120 + i as i64 * 52;
+            body += &format!("<rect x='{cx}' y='{}' width='44' height='24' rx='6' fill='{CAP}' stroke='{CAP_EDGE}'/>", y - 1);
+            body += &text(
+                &(cx + 22).to_string(),
+                &(y + 15).to_string(),
+                k.unwrap_or(""),
+                12,
+                TEXT,
+                "middle",
+                "normal",
+            );
+        }
+    }
+    svg("keymap.svg", 740, 528, &body);
+}
+
 fn layers() {
     let mut body = text(
         &24.to_string(),
@@ -763,6 +884,7 @@ fn architecture() {
 
 fn main() {
     layout();
+    keymap();
     layers();
     status();
     modes();
