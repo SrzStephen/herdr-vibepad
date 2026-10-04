@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+    # Apply the udev rule to a pad that is already plugged in.
+    if command -v udevadm >/dev/null && udevadm control --reload-rules 2>/dev/null; then
+        udevadm trigger --action=change --subsystem-match=hidraw --subsystem-match=input \
+            --property-match=ID_VENDOR_ID=6d7d || true
+    fi
+    # Start the user service at every user's login.
+    systemctl --global enable agentpad.service || true
+fi

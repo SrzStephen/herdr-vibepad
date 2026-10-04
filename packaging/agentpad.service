@@ -1,0 +1,11 @@
+[Unit]
+Description=SDINNOVATION SIDE-KEYBOARD as a herdr controller
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/agentpad
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target
