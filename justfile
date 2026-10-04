@@ -90,4 +90,4 @@ status:
 
 # Remove build output and caches
 clean:
-    rm -rf dist target
+    rm -rf build dist target

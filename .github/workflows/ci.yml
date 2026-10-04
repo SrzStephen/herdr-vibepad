@@ -37,6 +37,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - uses: extractions/setup-just@v4
       - name: Build the .deb and smoke-test it in a clean container
         run: just deb-test

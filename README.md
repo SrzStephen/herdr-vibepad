@@ -152,7 +152,7 @@ recipes wrap every command below; run `just` to list them.
 **From a release `.deb`** (Debian/Ubuntu), download it from the GitHub
 release, or build it with `just deb`, then:
 
-    sudo apt install ./agentpad_<version>_all.deb
+    sudo apt install ./agentpad_<version>_amd64.deb
     systemctl --user daemon-reload && systemctl --user start agentpad
 
 The package installs the `agentpad`, `side-keyboard-keys` and
@@ -163,6 +163,7 @@ enabled for every user (it starts at login).
 
     just install
 
+This needs a Rust toolchain (e.g. via [rustup](https://rustup.rs)) on the machine.
 This builds a release binary (`cargo build --release`) and installs the
 `agentpad`, `side-keyboard-keys` and `side-keyboard-led` commands to
 `~/.local/bin`, installs the udev rule to `/etc/udev/rules.d` (uses sudo), and
@@ -176,7 +177,7 @@ no editable install, so after changing the code, run `just install` again
     just check       # cargo clippy + cargo fmt --check + shellcheck, then cargo test
     just fmt         # format and apply safe lint fixes
     just diagrams    # regenerate docs/*.svg from the daemon's layout and colours
-    just deb         # build dist/agentpad_<version>_all.deb
+    just deb         # build dist/agentpad_<version>_amd64.deb
     just deb-test    # also install it in a clean ubuntu:24.04 container and smoke-test it (docker)
     just logs        # follow the service log
 
