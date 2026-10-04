@@ -219,6 +219,39 @@ another session). It uses these methods:
 - `pane.send_keys` for the bottom row, because `agent.send_keys` only accepts
   named agents.
 
+Each call opens the socket, writes one JSON object and a newline, and reads
+one line back (2 s timeout). The `id` is always `"herdr-vibepad"`. A reply has
+either a `result` or an `error`; on an error the daemon logs it and carries on
+as if herdr hadn't answered. Reading the state looks like this (only the fields
+the daemon uses are shown, and real replies may carry more):
+
+    → {"id":"herdr-vibepad","method":"workspace.list","params":{}}
+    ← {"result":{"workspaces":[
+         {"workspace_id":"w1","number":1,"focused":true},
+         {"workspace_id":"w2","number":2,"focused":false}]}}
+
+    → {"id":"herdr-vibepad","method":"agent.list","params":{}}
+    ← {"result":{"agents":[
+         {"pane_id":"w1:p1","workspace_id":"w1","tab_id":"w1:t1",
+          "focused":true,"agent_status":"working"},
+         {"pane_id":"w1:p2","workspace_id":"w1","tab_id":"w1:t1",
+          "focused":false,"agent_status":"blocked"},
+         {"pane_id":"w2:p1","workspace_id":"w2","tab_id":"w2:t1",
+          "focused":false,"agent_status":"done"}]}}
+
+The focused workspace is the one with `"focused": true`, and the active agent
+is the agent with `"focused": true`. Agents are sorted by workspace `number`,
+then by the number in `tab_id` and in `pane_id` (`w1:t2` → 2, `w1:p3` → 3).
+`agent_status` is one of the statuses in the colour table above. The actions
+the pad sends back:
+
+    → {"id":"herdr-vibepad","method":"workspace.focus","params":{"workspace_id":"w2"}}
+    → {"id":"herdr-vibepad","method":"agent.focus","params":{"target":"w2:p1"}}
+    → {"id":"herdr-vibepad","method":"pane.send_keys","params":{"pane_id":"w1:p1","keys":["esc"]}}
+
+(`agent.focus` also switches to the agent's workspace. The replies to these
+aren't used.)
+
 It re-reads the state every 0.25 s and after every press. If herdr isn't
 running, the agent keys just go dark until it is.
 
