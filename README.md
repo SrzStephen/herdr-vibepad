@@ -95,6 +95,63 @@ factory-reset pad is configured without the vendor's app.
 
 ![The code each key and knob sends](docs/codes.svg)
 
+**Finding the pad.** The pad is identified by USB id `6d7d:dcfc`, matched in
+each `/sys/class/hidraw/hidrawN/device/uevent` (it must contain `00006D7D:0000DCFC`).
+It exposes several hidraw nodes, told apart by the end of the uevent's
+interface path:
+
+| Interface | Used for | Access |
+|---|---|---|
+| `/input1` | the raw 8-byte key reports (see **Reading keys**) | read-only, non-blocking |
+| `/input2` | the vendor configuration channel: profiles, key table, LEDs | read/write |
+
+**The configuration protocol.** This is the channel the vendor's WebHID
+configurator (sdcx-tech.com) uses, and `keys.rs` and `led.rs` speak the same
+commands. Every request is one 64-byte output report. Since the reports are
+unnumbered, a leading `0x00` report-id byte is written first (65 bytes in all),
+and the payload is zero-padded. Every command starts with `0x06` and a command
+byte. Replies are 64-byte input reports starting `0xAA`, then the echoed
+command byte. The pad answers one request at a time: the daemon waits for the
+matching reply (up to 1 s) before sending the next, and skips unrelated
+reports. Back-to-back key-table writes without waiting for the ack corrupt
+the table.
+
+| Payload (after `06`) | Does | Reply |
+|---|---|---|
+| `05` | device info: `r[15]` = profile count (6), `r[16]` = active profile | `AA 05 …` |
+| `FB n` | select profile `n` (0–5) | `AA FB …` (the pad sometimes switches without replying, so the daemon re-reads the profile to check) |
+| `08 3A offL offH 00 layer` | read up to 56 bytes of the key table at byte offset `off` | `AA 07/08 … offL offH …`, data from `r[8]` |
+| `10 07 offL offH 00 layer 00 t b1 b2 b3` | write one 4-byte slot at offset `4 × slot` | `AA 10 …` |
+| `0A` | read the backlight state | `AA …`, 11-byte body at `r[5..16]` |
+| `0B len 00 00 <11-byte state>` | write the backlight state (no reply) | none |
+| `12 len+3 offL offH 00 00 00 <RGB…>` | bulk per-key colours from byte offset `off`, 3 bytes per key, up to 56 bytes a frame | none |
+| `14 03 offL offH 00 00 00 RR GG BB` | one key's colour at offset `3 × index` | none |
+
+`layer` is always 0: the pad keeps one layer per profile. Offsets are 16-bit
+little-endian (`offL offH`). The key table holds 25 slots of 4 bytes, so the
+daemon reads it in two chunks (offsets 0 and 56). Slots 0–15 are the keys, in
+the pad's own numbering (see below). Slots 16–24 are the knobs, 3 each, in the order
+press, right (clockwise), left.
+
+A slot is `[type, b1, b2, b3]`:
+
+| Type | Meaning | Bytes |
+|---|---|---|
+| `0x20` | keyboard key | `b1` = modifier bitmask (`01` ctrl, `02` shift, `04` alt, `08` super, `10`–`80` the right-hand versions), `b2` = HID usage |
+| `0x30` | media key | `b1 b2` = 16-bit consumer usage, little-endian |
+| `0x1F` | function the pad performs itself (`13` = switch to the next profile) | `b1` = function |
+| `0x60` | macro | `b1` = macro number |
+| `0x13` | disabled | none |
+
+The backlight state is `[type, 0, mode, brightness, speed, direction, colour
+flag, 0, hue, saturation, value]`. `mode` is 0 off, 1 solid, 2 breathing, 3
+light-on-press, 4 tide, 5 custom (per-key). `brightness` is 0–4. Per-key colours
+are only shown in mode 5, and mode 0 forces the colour flag to 0. The daemon
+sets mode 5 and brightness 4, then streams the whole frame with `12`.
+
+Two commands must never be sent: `0x55` and `0x5A` put the pad into its
+bootloader. The CLIs only send the commands above.
+
 **Reading keys.** Linux's keyboard driver drops F13–F24 from this pad and
 passes through only the shift and ctrl modifiers, so the daemon can't use
 normal key events. Instead it reads the raw 8-byte key reports from the pad's
@@ -113,6 +170,45 @@ right and top to bottom:
      2  6 10 14             4  5  6  7
      1  5  9 13             8  9 10 11
      0  4  8 12            12 13 14 15
+
+**Setting up the pad (first time).** There is no separate setup script: the
+daemon does everything in the Startup list itself the first time it sees the
+pad, and the settings live on the pad. So the initial mapping is just:
+
+    sudo apt install ./herdr-vibepad_<version>_amd64.deb   # or: just install
+    systemctl --user start herdr-vibepad
+    journalctl --user -u herdr-vibepad -f
+
+The log should show `pad switched from profile N to 5` (if another profile
+was active), `programmed N slot(s) of profile 5` (N is how many slots differed;
+25 on a pad that was never configured) and `pad ready, profile 5`. On later starts nothing is
+reprogrammed, because the table already matches. Plug in the pad first (and
+check you have access to its hidraw nodes, see **Permissions and service**),
+or the daemon waits until it appears.
+
+To do the same by hand, for example to check the pad or to program it without
+the daemon, use the `side-keyboard-keys` CLI. Profile 5 is the one the daemon
+owns; `--profile 5` edits it without changing the active profile, and the
+first change saves the old table to `~/.side-keyboard-keys-backup-p5.json`:
+
+    side-keyboard-keys read --profile 5                  # what it sends now
+    for i in $(seq 0 11); do side-keyboard-keys set $i f$((13 + i)) --profile 5; done
+    for i in 12 13 14 15; do side-keyboard-keys set $i shift+f$((i + 1)) --profile 5; done
+    n=17
+    for k in 1 2 3; do for p in press right left; do
+        key=shift+f$n; [ $k$p = 3left ] && key=ctrl+f13
+        side-keyboard-keys set knob$k.$p $key --profile 5; n=$((n + 1))
+    done; done
+    side-keyboard-keys profile 5                         # make profile 5 the active one
+    side-keyboard-led set 5                              # per-key LED mode
+
+Written out, that is keys 0–11 → `f13`–`f24`, keys 12–15 → `shift+f13`–`shift+f16`,
+and the knobs → `shift+f17`–`shift+f24` (knob 1 press, right, left; then knob 2
+and knob 3 the same way), except knob 3 left → `ctrl+f13`. These are the codes
+in the diagram above.
+`side-keyboard-keys read` after the loops should show exactly that table. The
+mapping is stored on the pad, so it survives unplugging and works on any
+computer. `side-keyboard-keys restore --profile 5` puts the original back.
 
 **Talking to herdr.** The daemon sends newline-delimited JSON requests to
 herdr's socket, `~/.config/herdr/herdr.sock` (set `HERDR_VIBEPAD_HERDR_SOCK` for

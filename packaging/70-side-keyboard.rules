@@ -1,5 +1,5 @@
 # SDINNOVATION SIDE-KEYBOARD (6d7d:dcfc): give the user access to its hidraw
-# nodes (keys, profiles, LEDs) and input nodes (so herdr-vibepad.py can grab keys).
+# nodes (keys, profiles, LEDs) and input nodes (so herdr-vibepad can grab keys).
 # uaccess covers the logged-in desktop user and must sort before
 # 73-seat-late.rules; the plugdev group covers WSL, which has no seat.
 SUBSYSTEM=="hidraw", ATTRS{idVendor}=="6d7d", ATTRS{idProduct}=="dcfc", MODE="0660", GROUP="plugdev", TAG+="uaccess"
