@@ -2,6 +2,7 @@
 
 use std::sync::Mutex;
 
+pub mod daemon;
 pub mod herdr;
 pub mod hid;
 pub mod keys;
