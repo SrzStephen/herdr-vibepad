@@ -1,11 +1,8 @@
 //! Drive herdr workspaces and agents from the SDINNOVATION SIDE-KEYBOARD (6d7d:dcfc).
 //!
-//! Ported from `src/agentpad/daemon.py`; see that module's docstring for the
-//! user-facing behaviour description. This file currently carries the
-//! daemon's core plumbing: key/LED position mapping, the pad's hidraw slot
-//! protocol table, the `Pad` hardware handle and its event loop, and `State`
-//! (herdr's workspace/agent snapshot). `AgentPad` (the actual key-handling
-//! behaviour) is built on top of this in a later module.
+//! Ported from `src/agentpad/daemon.py`. Holds key/LED position mapping, the
+//! `Pad` hardware handle, `State` (herdr's snapshot) and `AgentPad`, the
+//! key-handling behaviour and event loop.
 
 use std::collections::HashMap;
 use std::os::fd::{AsRawFd, BorrowedFd, OwnedFd, RawFd};
@@ -262,9 +259,14 @@ impl Pad {
         let mut inputs = Vec::new();
         for path in hid::find_input_event_nodes("6d7d", "dcfc") {
             let fd = open_rdonly_nonblock(&path)?;
-            // A failed grab is non-fatal, matching Python, which doesn't check it either.
-            unsafe {
-                libc::ioctl(fd.as_raw_fd(), EVIOCGRAB, 1);
+            // A failed grab (EBUSY: another instance holds it) is fatal: this is
+            // the implicit single-instance guard.
+            if unsafe { libc::ioctl(fd.as_raw_fd(), EVIOCGRAB, 1) } < 0 {
+                return Err(PadGone(format!(
+                    "grab {}: {}",
+                    path.display(),
+                    Errno::last()
+                )));
             }
             inputs.push(fd);
         }
@@ -423,9 +425,9 @@ impl Pad {
 
     /// Send `colors` (indexed by physical position) to the pad's per-key LEDs,
     /// unless it's the frame already showing.
-    pub fn show(&mut self, colors: &[[u8; 3]; 16]) {
+    pub fn show(&mut self, colors: &[[u8; 3]; 16]) -> Result<(), PadGone> {
         if self.frame.as_ref() == Some(colors) {
-            return;
+            return Ok(());
         }
         let mut data = Vec::with_capacity(3 * keys::NUM_KEYS);
         for i in 0..keys::NUM_KEYS {
@@ -434,8 +436,14 @@ impl Pad {
         // Same bulk per-key write as led::set_all_keys; 48 bytes fit one frame.
         let mut payload = vec![0x06u8, 0x12, (data.len() + 3) as u8, 0, 0, 0, 0, 0];
         payload.extend_from_slice(&data);
-        hid::send(self.hid.as_raw_fd(), &payload).expect("hid write failed");
+        hid::send(self.hid.as_raw_fd(), &payload).map_err(|e| match e.raw_os_error() {
+            Some(code) if code == libc::ENODEV || code == libc::EIO => {
+                PadGone("pad disconnected".to_string())
+            }
+            _ => PadGone(format!("hid write failed: {e}")),
+        })?;
         self.frame = Some(*colors);
+        Ok(())
     }
 }
 
@@ -756,7 +764,7 @@ impl AgentPad {
 
         let mut st = State::fetch(&self.sock_path);
         let frame = to_frame(&self.colors(&st, now()));
-        self.pad.as_mut().expect("checked above").show(&frame);
+        self.pad.as_mut().expect("checked above").show(&frame)?;
 
         let mut next_poll = now() + POLL;
         loop {
@@ -776,7 +784,7 @@ impl AgentPad {
                 next_poll = now() + POLL;
             }
             let frame = to_frame(&self.colors(&st, now()));
-            self.pad.as_mut().expect("checked above").show(&frame);
+            self.pad.as_mut().expect("checked above").show(&frame)?;
         }
     }
 }

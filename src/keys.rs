@@ -1,8 +1,6 @@
 //! Set what each key and knob on the SDINNOVATION SIDE-KEYBOARD (6d7d:dcfc) sends.
 //!
-//! Ported from `src/agentpad/keys.py`; see that module's docstring for the
-//! user-facing protocol description (also reproduced as this crate's
-//! `side-keyboard-keys` binary's usage text).
+//! Ported from `src/agentpad/keys.py`. The protocol is described in the `side-keyboard-keys` usage text.
 
 use std::env;
 use std::ffi::{CStr, CString};
@@ -309,6 +307,13 @@ pub fn read_table(fd: RawFd) -> Result<Vec<[u8; 4]>, String> {
             }
         }
         off += 56;
+    }
+    if raw.len() < 4 * NUM_SLOTS {
+        return Err(format!(
+            "short key-table reply: got {} bytes, expected {}",
+            raw.len(),
+            4 * NUM_SLOTS
+        ));
     }
     raw.truncate(4 * NUM_SLOTS);
     Ok(raw.chunks(4).map(|c| [c[0], c[1], c[2], c[3]]).collect())

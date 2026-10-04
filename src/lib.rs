@@ -1,4 +1,4 @@
-//! agentpad: A hardware abstraction and scripting engine for the agentpad keyboard.
+//! agentpad: HID protocol, herdr client and daemon logic for the SDINNOVATION SIDE-KEYBOARD.
 
 use std::sync::Mutex;
 

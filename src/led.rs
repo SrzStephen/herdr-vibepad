@@ -1,8 +1,6 @@
 //! Control the LEDs on the SDINNOVATION SIDE-KEYBOARD (6d7d:dcfc, 16 keys + 3 knobs).
 //!
-//! Ported from `src/agentpad/led.py`; see that module's docstring for the
-//! user-facing protocol description (also reproduced as this crate's
-//! `side-keyboard-led` binary's usage text).
+//! Ported from `src/agentpad/led.py`. The protocol is described in the `side-keyboard-led` usage text.
 
 use std::io;
 use std::os::unix::io::RawFd;

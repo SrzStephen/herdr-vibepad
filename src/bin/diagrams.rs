@@ -2,9 +2,7 @@
 //! and colours.
 //!
 //! Run with `cargo run --release --bin diagrams` after changing colours,
-//! layers or the key layout. Ported from `scripts/diagrams.py`, which stays
-//! in the tree as read-only reference material until the Python source is
-//! retired.
+//! layers or the key layout. Ported from `scripts/diagrams.py`.
 //!
 //! Dev-only: never installed by the .deb, and (like its Python original) has
 //! no automated tests.
