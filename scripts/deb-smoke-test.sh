@@ -3,12 +3,11 @@
 set -eux
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq /dist/agentpad_*_all.deb >/dev/null
+apt-get install -y -qq /dist/agentpad_*.deb >/dev/null
 
 agentpad --help | grep -q "herdr"
 side-keyboard-keys 2>&1 | grep -q "Set what each key"
 side-keyboard-led 2>&1 | grep -q "Control the LEDs"
-python3 -c "import agentpad.daemon"
 
 udevadm verify /usr/lib/udev/rules.d/70-side-keyboard.rules
 systemd-analyze verify /usr/lib/systemd/user/agentpad.service

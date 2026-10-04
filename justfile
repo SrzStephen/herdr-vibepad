@@ -2,6 +2,7 @@
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
+bin_dir := env("HOME") / ".local/bin"
 udev_rule := "/etc/udev/rules.d/70-side-keyboard.rules"
 user_unit := env("HOME") / ".config/systemd/user/agentpad.service"
 
@@ -9,33 +10,33 @@ user_unit := env("HOME") / ".config/systemd/user/agentpad.service"
 default:
     @just --list
 
-# Create .venv with the dev tools (pytest, ruff)
+# Fetch Cargo dependencies
 sync:
-    uv sync
+    cargo fetch
 
-# Lint Python (ruff) and shell scripts (shellcheck)
+# Lint Rust (clippy, fmt) and shell scripts (shellcheck)
 lint:
-    uv run ruff check .
-    uv run ruff format --check .
+    cargo clippy --all-targets --locked -- -D warnings
+    cargo fmt --check
     shellcheck scripts/*.sh packaging/deb/postinst packaging/deb/prerm
 
-# Format Python and apply safe lint fixes
+# Format Rust and apply safe lint fixes
 fmt:
-    uv run ruff format .
-    uv run ruff check --fix .
+    cargo fmt
+    cargo clippy --fix --allow-dirty --allow-staged
 
-# Run the tests (extra arguments go to pytest)
+# Run the tests (extra arguments go to cargo test)
 test *args:
-    uv run pytest {{ args }}
+    cargo test --locked {{ args }}
 
 # Lint and test
 check: lint test
 
 # Regenerate the README diagrams in docs/ from the daemon's layout and colours
 diagrams:
-    uv run python scripts/diagrams.py
+    cargo run --release --locked --bin diagrams
 
-# Build dist/agentpad_<version>_all.deb
+# Build dist/agentpad_<version>_amd64.deb
 deb:
     scripts/build-deb.sh
 
@@ -46,20 +47,23 @@ deb-test image="ubuntu:24.04": deb
 # Build the .deb and install it on this machine (replaces `just install`)
 install-deb: deb
     -just uninstall
-    sudo apt-get install -y --reinstall ./dist/agentpad_*_all.deb
+    sudo apt-get install -y --reinstall ./dist/agentpad_*.deb
     systemctl --user daemon-reload
     systemctl --user enable agentpad
     systemctl --user restart agentpad
 
-# Install from this checkout with uv (editable), plus the udev rule and user service
+# Install compiled binaries, plus the udev rule and user service
 install:
-    uv tool install --force --editable .
+    cargo build --release --locked
+    install -Dm755 target/release/agentpad {{ bin_dir }}/agentpad
+    install -Dm755 target/release/side-keyboard-keys {{ bin_dir }}/side-keyboard-keys
+    install -Dm755 target/release/side-keyboard-led {{ bin_dir }}/side-keyboard-led
     sudo install -m 644 packaging/70-side-keyboard.rules {{ udev_rule }}
     sudo udevadm control --reload-rules
     sudo udevadm trigger --action=change --subsystem-match=hidraw --subsystem-match=input --property-match=ID_VENDOR_ID=6d7d
     rm -f {{ user_unit }}
     mkdir -p "$(dirname {{ user_unit }})"
-    sed "s|^ExecStart=.*|ExecStart=$(uv tool dir --bin --color never)/agentpad|" packaging/agentpad.service > {{ user_unit }}
+    sed "s|^ExecStart=.*|ExecStart={{ bin_dir }}/agentpad|" packaging/agentpad.service > {{ user_unit }}
     systemctl --user daemon-reload
     systemctl --user reenable agentpad
     systemctl --user restart agentpad
@@ -70,13 +74,13 @@ uninstall:
     rm -f {{ user_unit }}
     systemctl --user daemon-reload
     sudo rm -f {{ udev_rule }}
-    -uv tool uninstall agentpad
+    rm -f {{ bin_dir }}/agentpad {{ bin_dir }}/side-keyboard-keys {{ bin_dir }}/side-keyboard-led
 
 # Follow the service log
 logs:
     journalctl --user -u agentpad -f
 
-# Restart the service (after editing the code with `just install`'s editable install)
+# Restart the service (run `just install` after editing Rust code, since there's no editable install)
 restart:
     systemctl --user restart agentpad
 
@@ -86,4 +90,4 @@ status:
 
 # Remove build output and caches
 clean:
-    rm -rf build dist .pytest_cache .ruff_cache
+    rm -rf build dist target

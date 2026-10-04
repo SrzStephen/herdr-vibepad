@@ -46,8 +46,8 @@ numbered options, confirm with `y` or `n`, or cancel with `esc`.
 | Layer | Mode | Knob press | Colour | Bottom row, left to right |
 |---|---|---|---|---|
 | 1 | Claude | knob 1 | reddish orange | `1` `2` `3` `esc` |
-| 2 | Codex | knob 2 | blue | `1` `2` `3` – |
-| 3 | Kiro | knob 3 | purple | `y` `n` `t` – |
+| 2 | Codex | knob 2 | blue | `1` `2` `3` `esc` |
+| 3 | Kiro | knob 3 | purple | `y` `n` `t` `esc` |
 
 The daemon starts in layer 1.
 
@@ -146,56 +146,62 @@ agent-key mode (back to focused workspace) reset when the daemon restarts.
 
 ## Install
 
-Needs Linux with systemd and udev, Python 3.10+, and herdr running as your
-user. `just` recipes wrap every command below; run `just` to list them.
+Needs Linux with systemd and udev, and herdr running as your user. `just`
+recipes wrap every command below; run `just` to list them.
 
 **From a release `.deb`** (Debian/Ubuntu), download it from the GitHub
 release, or build it with `just deb`, then:
 
-    sudo apt install ./agentpad_<version>_all.deb
+    sudo apt install ./agentpad_<version>_amd64.deb
     systemctl --user daemon-reload && systemctl --user start agentpad
 
 The package installs the `agentpad`, `side-keyboard-keys` and
 `side-keyboard-led` commands, the udev rule, and a user service that is
 enabled for every user (it starts at login).
 
-**From this checkout with [uv](https://docs.astral.sh/uv/):**
+**From this checkout:**
 
     just install
 
-This runs `uv tool install --editable .` (commands land in `~/.local/bin`),
-installs the udev rule to `/etc/udev/rules.d` (uses sudo), and writes, enables
-and starts `~/.config/systemd/user/agentpad.service`. It's editable, so after
-changing the code, `just restart` picks it up. `just uninstall` undoes it.
+This needs a Rust toolchain (e.g. via [rustup](https://rustup.rs)) on the machine.
+This builds a release binary (`cargo build --release`) and installs the
+`agentpad`, `side-keyboard-keys` and `side-keyboard-led` commands to
+`~/.local/bin`, installs the udev rule to `/etc/udev/rules.d` (uses sudo), and
+writes, enables and starts `~/.config/systemd/user/agentpad.service`. There's
+no editable install, so after changing the code, run `just install` again
+(not just `just restart`) to pick it up. `just uninstall` undoes it.
 
 ## Develop
 
-    just sync        # uv sync: .venv with pytest and ruff
-    just check       # ruff check + ruff format --check + shellcheck, then pytest
+    just sync        # cargo fetch
+    just check       # cargo clippy + cargo fmt --check + shellcheck, then cargo test
     just fmt         # format and apply safe lint fixes
     just diagrams    # regenerate docs/*.svg from the daemon's layout and colours
-    just deb         # build dist/agentpad_<version>_all.deb
+    just deb         # build dist/agentpad_<version>_amd64.deb
     just deb-test    # also install it in a clean ubuntu:24.04 container and smoke-test it (docker)
     just logs        # follow the service log
 
-The tests need no hardware or herdr: `tests/conftest.py` runs a fake herdr
+The tests need no hardware or herdr: `tests/support/` runs a fake herdr
 socket, and the key-decoding tests replay HID reports captured from the pad.
 
-Code lives in `src/agentpad/`: `daemon.py` is the service, `keys.py` and
-`led.py` speak the pad's config protocol (also usable as the
-`side-keyboard-keys` and `side-keyboard-led` commands). Tunables are constants
-at the top of `daemon.py`: `BOTTOM_KEYS`, `LAYER_COLORS`, `BOTTOM_BRIGHTNESS`,
-`BRIGHTNESS_STEP`, `BRIGHTNESS_MIN`, `STATUS_COLORS`, `INACTIVE_DIM`, `PAD_PROFILE`.
+Code lives in `src/`: `daemon.rs` is the service, `keys.rs` and `led.rs` speak
+the pad's config protocol, `hid.rs` wraps the raw device I/O, and `herdr.rs`
+is the herdr socket client. `src/bin/` has the four binaries: `agentpad` (the
+daemon), `side-keyboard-keys` and `side-keyboard-led` (thin CLIs over
+`keys.rs` and `led.rs`), and `diagrams` (dev-only, regenerates the README's
+SVGs). Tunables are constants near the top of `daemon.rs`: `BOTTOM_KEYS`,
+`LAYER_COLORS`, `BOTTOM_BRIGHTNESS`, `BRIGHTNESS_STEP`, `BRIGHTNESS_MIN`,
+`INACTIVE_DIM`, `PAD_PROFILE`, and the `status_color` function.
 
-The version lives in `pyproject.toml`.
+The version lives in `Cargo.toml`.
 
 ## CI and releases
 
 `.github/workflows/ci.yml` runs on pushes to `main`, pull requests and tags:
-lint (ruff, shellcheck), tests on Python 3.10, 3.12 and 3.13, then builds the
-`.deb`, smoke-tests it in a container and uploads it as a build artifact.
-Pushing a tag `v<version>` that matches `pyproject.toml` also publishes a
-GitHub release with the `.deb` attached:
+lint (`cargo clippy`, `cargo fmt --check`, shellcheck), tests on Rust stable,
+then builds the `.deb`, smoke-tests it in a container and uploads it as a
+build artifact. Pushing a tag `v<version>` that matches `Cargo.toml` also
+publishes a GitHub release with the `.deb` attached:
 
     git tag v0.1.0 && git push origin v0.1.0
 
@@ -256,8 +262,8 @@ keys away from a Linux desktop.
     side-keyboard-keys profile 4                     # the profile that was active before
     side-keyboard-led raw 01 00 01 04 04 00 01 ff aa ff ff   # previous solid-blue lighting
 
-Run the `side-keyboard-*` commands before uninstalling, or with
-`uv run` from this checkout.
+Run the `side-keyboard-*` commands before uninstalling, or from a built
+checkout: `./target/release/side-keyboard-keys ...`.
 
 When the daemon isn't running, profile 5 keys send F13–F24 to the desktop.
 
