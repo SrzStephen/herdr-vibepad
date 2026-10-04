@@ -322,13 +322,16 @@ The version lives in `Cargo.toml`.
 
 ## CI and releases
 
-`.github/workflows/ci.yml` runs on pushes to `main`, pull requests and tags:
+`.github/workflows/ci.yml` runs on pushes to `main` and pull requests:
 lint (`cargo clippy`, `cargo fmt --check`, shellcheck), tests on Rust stable,
 then builds the `.deb`, smoke-tests it in a container and uploads it as a
-build artifact. Pushing a tag `v<version>` that matches `Cargo.toml` also
-publishes a GitHub release with the `.deb` attached:
+build artifact. Every action is pinned to a commit hash.
 
-    git tag v0.1.0 && git push origin v0.1.0
+To release, run the **Release** workflow from the Actions tab on `main` and
+pick `patch`, `minor` or `major`. It runs CI, bumps the version in
+`Cargo.toml` and `Cargo.lock`, rebuilds and smoke-tests the `.deb`, commits
+`Release v<version>` to `main`, tags it and publishes a GitHub release with
+the `.deb` attached.
 
 ## Running under WSL2
 

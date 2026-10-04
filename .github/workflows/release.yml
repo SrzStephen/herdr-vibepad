@@ -1,0 +1,63 @@
+name: Release
+
+# Run manually from the Actions tab: bumps the version in Cargo.toml, tags it,
+# and publishes a GitHub release with the .deb attached.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which part of the version to bump
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: ci
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+      - name: Bump the version in Cargo.toml and Cargo.lock
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          current=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
+          IFS=. read -r major minor patch <<< "$current"
+          case "$BUMP" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+          next="$major.$minor.$patch"
+          sed -i "0,/^version = \"$current\"/s//version = \"$next\"/" Cargo.toml
+          cargo update --workspace
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+      - name: Build the .deb and smoke-test it in a clean container
+        run: just deb-test
+      - name: Commit the bump and tag it
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Release v$VERSION"
+          git tag "v$VERSION"
+          git push origin HEAD:main "v$VERSION"
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: gh release create "v$VERSION" dist/*.deb --generate-notes
