@@ -3,7 +3,7 @@
 set -eux
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq /dist/agentpad_*_all.deb >/dev/null
+apt-get install -y -qq /dist/agentpad_*.deb >/dev/null
 
 agentpad --help | grep -q "herdr"
 side-keyboard-keys 2>&1 | grep -q "Set what each key"
