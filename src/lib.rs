@@ -2,3 +2,4 @@
 
 pub mod hid;
 pub mod keys;
+pub mod led;
