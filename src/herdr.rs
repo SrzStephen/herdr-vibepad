@@ -45,7 +45,7 @@ fn try_call(
         .set_write_timeout(Some(TIMEOUT))
         .map_err(|e| e.to_string())?;
 
-    let request = serde_json::json!({"id": "agentpad", "method": method, "params": params});
+    let request = serde_json::json!({"id": "herdr-vibepad", "method": method, "params": params});
     let mut line = serde_json::to_vec(&request).map_err(|e| e.to_string())?;
     line.push(b'\n');
 

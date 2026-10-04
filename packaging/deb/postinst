@@ -7,5 +7,5 @@ if [ "$1" = configure ]; then
             --property-match=ID_VENDOR_ID=6d7d || true
     fi
     # Start the user service at every user's login.
-    systemctl --global enable agentpad.service || true
+    systemctl --global enable herdr-vibepad.service || true
 fi

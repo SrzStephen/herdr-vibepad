@@ -1,4 +1,4 @@
-//! agentpad: HID protocol, herdr client and daemon logic for the SDINNOVATION SIDE-KEYBOARD.
+//! herdr-vibepad: HID protocol, herdr client and daemon logic for the SDINNOVATION SIDE-KEYBOARD.
 
 use std::sync::Mutex;
 

@@ -1,5 +1,5 @@
 {
-  "name": "agentpad",
+  "name": "herdr-vibepad",
   "image": "ubuntu:24.04",
   "features": {
     "ghcr.io/devcontainers/features/rust:1": {},

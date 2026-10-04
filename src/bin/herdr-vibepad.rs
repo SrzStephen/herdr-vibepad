@@ -1,11 +1,11 @@
-//! CLI binary for `agentpad::daemon` — see `USAGE` below (byte-identical to
+//! CLI binary for `herdr_vibepad::daemon` — see `USAGE` below (byte-identical to
 //! `src/agentpad/daemon.py`'s module docstring).
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Duration;
 
-use agentpad::daemon::{AgentPad, Pad, PAD_PROFILE};
+use herdr_vibepad::daemon::{Pad, VibePad, PAD_PROFILE};
 
 const USAGE: &str =
     "Drive herdr workspaces and agents from the SDINNOVATION SIDE-KEYBOARD (6d7d:dcfc).
@@ -32,7 +32,7 @@ nothing reaches the desktop. The pad numbers its keys and LEDs column by
 column from the bottom left. Everything else happens here, through herdr's
 socket API.
 
-  agentpad               run the daemon (it waits for the pad and for herdr)
+  herdr-vibepad               run the daemon (it waits for the pad and for herdr)
 
 Needs access to the pad's hidraw and input nodes: see 70-side-keyboard.rules.
 ";
@@ -42,14 +42,17 @@ fn home_dir() -> String {
 }
 
 fn herdr_sock_path() -> PathBuf {
-    match std::env::var("AGENTPAD_HERDR_SOCK") {
+    match std::env::var("HERDR_VIBEPAD_HERDR_SOCK") {
         Ok(v) if !v.is_empty() => PathBuf::from(v),
         _ => PathBuf::from(format!("{}/.config/herdr/herdr.sock", home_dir())),
     }
 }
 
 fn brightness_file_path() -> PathBuf {
-    PathBuf::from(format!("{}/.local/state/agentpad-brightness", home_dir()))
+    PathBuf::from(format!(
+        "{}/.local/state/herdr-vibepad-brightness",
+        home_dir()
+    ))
 }
 
 fn main() -> ExitCode {
@@ -71,15 +74,15 @@ fn main() -> ExitCode {
         let pad = match Pad::open() {
             Ok(p) => p,
             Err(e) => {
-                agentpad::log(&format!("waiting for pad: {e}"), true);
+                herdr_vibepad::log(&format!("waiting for pad: {e}"), true);
                 std::thread::sleep(Duration::from_secs(2));
                 continue;
             }
         };
-        agentpad::log(&format!("pad ready, profile {PAD_PROFILE}"), false);
-        let mut agent_pad = AgentPad::new(Some(pad), sock_path.clone(), brightness_file.clone());
+        herdr_vibepad::log(&format!("pad ready, profile {PAD_PROFILE}"), false);
+        let mut agent_pad = VibePad::new(Some(pad), sock_path.clone(), brightness_file.clone());
         if let Err(e) = agent_pad.run() {
-            agentpad::log(&format!("{e}"), false);
+            herdr_vibepad::log(&format!("{e}"), false);
         }
         // `agent_pad`'s `Option<Pad>` is dropped here, closing all its file
         // descriptors (matches Python's `pad.close()` in `finally`).

@@ -1,4 +1,4 @@
-Package: agentpad
+Package: herdr-vibepad
 Version: @VERSION@
 Architecture: amd64
 Maintainer: Stephen Mott <stephen@mott.email>
@@ -11,4 +11,4 @@ Description: SDINNOVATION SIDE-KEYBOARD as a herdr controller
  Turns the 16-key, 3-knob SDINNOVATION SIDE-KEYBOARD (6d7d:dcfc) into a
  controller for herdr workspaces and agents: knobs switch workspace, agent
  and brightness, keys focus agents and answer their prompts, and the key
- LEDs show each agent's status. Runs as the systemd user service agentpad.
+ LEDs show each agent's status. Runs as the systemd user service herdr-vibepad.

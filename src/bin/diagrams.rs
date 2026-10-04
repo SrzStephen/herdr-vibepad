@@ -10,7 +10,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
-use agentpad::daemon;
+use herdr_vibepad::daemon;
 
 const CARD: &str = "#1b1f24";
 const TEXT: &str = "#e6edf3";
@@ -57,14 +57,14 @@ fn escape_xml(s: &str) -> String {
         .replace('>', "&gt;")
 }
 
-/// A herdr state for `AgentPad::colors()`.
+/// A herdr state for `VibePad::colors()`.
 fn led_colors(
     state: &daemon::State,
     layer: u8,
     brightness: i32,
     all_workspaces: bool,
 ) -> [(u8, u8, u8); 16] {
-    let mut pad = daemon::AgentPad::new(None, PathBuf::new(), PathBuf::new());
+    let mut pad = daemon::VibePad::new(None, PathBuf::new(), PathBuf::new());
     pad.layer = layer;
     pad.brightness = brightness;
     pad.all_workspaces = all_workspaces;
@@ -731,7 +731,7 @@ fn brightness() {
     body += &text(
         &24.to_string(),
         &330.to_string(),
-        "5% per click, 5–100%, remembered in ~/.local/state/agentpad-brightness",
+        "5% per click, 5–100%, remembered in ~/.local/state/herdr-vibepad-brightness",
         12,
         MUTED,
         "start",
@@ -841,7 +841,7 @@ fn architecture() {
         52,
         160,
         116,
-        "agentpad",
+        "herdr-vibepad",
         &[
             "systemd user service",
             "layers, modes,",

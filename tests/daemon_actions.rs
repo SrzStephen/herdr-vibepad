@@ -1,6 +1,6 @@
 mod support;
-use agentpad::daemon::{self, AgentPad, State};
-use agentpad::keys;
+use herdr_vibepad::daemon::{self, State, VibePad};
+use herdr_vibepad::keys;
 use std::path::Path;
 
 fn knob(n: usize, part: &str) -> usize {
@@ -11,7 +11,7 @@ fn key_at(pos: usize) -> usize {
         .find(|&i| daemon::position(i) == pos)
         .unwrap()
 }
-fn press(pad: &mut AgentPad, slot: usize, sock: &Path, now: f64) -> State {
+fn press(pad: &mut VibePad, slot: usize, sock: &Path, now: f64) -> State {
     pad.press(slot, &State::fetch(sock), now);
     State::fetch(sock)
 }
@@ -20,7 +20,7 @@ fn press(pad: &mut AgentPad, slot: usize, sock: &Path, now: f64) -> State {
 fn knob2_steps_through_agents_and_wraps() {
     let dir = tempfile::tempdir().unwrap();
     let fake = support::two_workspace_herdr();
-    let mut pad = AgentPad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
+    let mut pad = VibePad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
     let mut active = vec![];
     for _ in 0..3 {
         active.push(press(&mut pad, knob(2, "right"), &fake.sock_path, 0.0).active);
@@ -43,7 +43,7 @@ fn knob2_steps_through_agents_and_wraps() {
 fn knob1_steps_through_workspaces_and_wraps() {
     let dir = tempfile::tempdir().unwrap();
     let fake = support::two_workspace_herdr();
-    let mut pad = AgentPad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
+    let mut pad = VibePad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
     assert_eq!(
         press(&mut pad, knob(1, "right"), &fake.sock_path, 0.0).workspace,
         Some("w2".into())
@@ -62,7 +62,7 @@ fn knob1_steps_through_workspaces_and_wraps() {
 fn agent_key_focuses_that_agent() {
     let dir = tempfile::tempdir().unwrap();
     let fake = support::two_workspace_herdr();
-    let mut pad = AgentPad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
+    let mut pad = VibePad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
     assert_eq!(
         press(&mut pad, key_at(2), &fake.sock_path, 0.0).active,
         Some("w1:p3".into())
@@ -77,7 +77,7 @@ fn agent_key_focuses_that_agent() {
 fn agent_key_without_agent_does_nothing() {
     let dir = tempfile::tempdir().unwrap();
     let fake = support::two_workspace_herdr();
-    let mut pad = AgentPad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
+    let mut pad = VibePad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
     press(&mut pad, key_at(7), &fake.sock_path, 0.0);
     assert!(!fake.calls().iter().any(|(m, _)| m == "agent.focus"));
 }
@@ -86,7 +86,7 @@ fn agent_key_without_agent_does_nothing() {
 fn knob_press_selects_layer() {
     let dir = tempfile::tempdir().unwrap();
     let fake = support::two_workspace_herdr();
-    let mut pad = AgentPad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
+    let mut pad = VibePad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
     for n in [3, 2, 1] {
         press(&mut pad, knob(n, "press"), &fake.sock_path, 0.0);
         assert_eq!(pad.layer, n as u8);
@@ -97,7 +97,7 @@ fn knob_press_selects_layer() {
 fn bottom_row_sends_layer_keys_to_active_agent() {
     let dir = tempfile::tempdir().unwrap();
     let fake = support::two_workspace_herdr();
-    let mut pad = AgentPad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
+    let mut pad = VibePad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
     for layer in 1..=3usize {
         press(&mut pad, knob(layer, "press"), &fake.sock_path, 0.0);
         for pos in 12..16 {
@@ -134,7 +134,7 @@ fn knob3_changes_brightness_within_limits_and_remembers() {
     let fake = support::two_workspace_herdr();
     let dir = tempfile::tempdir().unwrap();
     let brightness_file = dir.path().join("brightness");
-    let mut pad = AgentPad::new(None, fake.sock_path.clone(), brightness_file.clone());
+    let mut pad = VibePad::new(None, fake.sock_path.clone(), brightness_file.clone());
     assert_eq!(pad.brightness, 100);
     press(&mut pad, knob(3, "right"), &fake.sock_path, 0.0);
     assert_eq!(pad.brightness, 100);
@@ -150,7 +150,7 @@ fn knob3_changes_brightness_within_limits_and_remembers() {
         "10"
     );
     assert_eq!(
-        AgentPad::new(None, fake.sock_path.clone(), brightness_file).brightness,
+        VibePad::new(None, fake.sock_path.clone(), brightness_file).brightness,
         10
     );
 }
@@ -161,7 +161,7 @@ fn no_herdr_means_empty_state() {
     assert!(st.workspaces.is_empty() && st.agents.is_empty() && st.active.is_none());
 }
 
-fn triple_press_knob1(pad: &mut AgentPad, sock: &Path, gap: f64, start: f64) {
+fn triple_press_knob1(pad: &mut VibePad, sock: &Path, gap: f64, start: f64) {
     for i in 0..3 {
         press(pad, knob(1, "press"), sock, start + i as f64 * gap);
     }
@@ -171,7 +171,7 @@ fn triple_press_knob1(pad: &mut AgentPad, sock: &Path, gap: f64, start: f64) {
 fn three_quick_knob1_presses_toggle_all_workspaces() {
     let dir = tempfile::tempdir().unwrap();
     let fake = support::two_workspace_herdr();
-    let mut pad = AgentPad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
+    let mut pad = VibePad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
     triple_press_knob1(&mut pad, &fake.sock_path, 0.1, 100.0);
     assert!(pad.all_workspaces && pad.layer == 1);
     triple_press_knob1(&mut pad, &fake.sock_path, 0.1, 200.0);
@@ -182,7 +182,7 @@ fn three_quick_knob1_presses_toggle_all_workspaces() {
 fn slow_or_double_knob1_presses_do_not_toggle() {
     let dir = tempfile::tempdir().unwrap();
     let fake = support::two_workspace_herdr();
-    let mut pad = AgentPad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
+    let mut pad = VibePad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
     triple_press_knob1(&mut pad, &fake.sock_path, 0.6, 300.0); // 1.2s from first to third
     assert!(!pad.all_workspaces);
     pad.knob1_presses.clear();
@@ -195,7 +195,7 @@ fn slow_or_double_knob1_presses_do_not_toggle() {
 fn all_workspaces_key_jumps_to_agent_in_other_workspace() {
     let dir = tempfile::tempdir().unwrap();
     let fake = support::two_workspace_herdr();
-    let mut pad = AgentPad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
+    let mut pad = VibePad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
     assert_eq!(
         press(&mut pad, key_at(3), &fake.sock_path, 0.0).active,
         Some("w1:p1".into())
@@ -216,8 +216,8 @@ fn all_workspaces_key_jumps_to_agent_in_other_workspace() {
 fn all_workspaces_mode_lights_every_agent() {
     let dir = tempfile::tempdir().unwrap();
     let fake = support::two_workspace_herdr();
-    let mut pad = AgentPad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
-    let lit = |pad: &AgentPad, st: &State| {
+    let mut pad = VibePad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
+    let lit = |pad: &VibePad, st: &State| {
         pad.colors(st, 0.0)[..12]
             .iter()
             .filter(|&&c| c != daemon::OFF)
@@ -246,7 +246,7 @@ fn state_with(agents: &[&str], active: Option<&str>, status: &[(&str, &str)]) ->
 fn bottom_row_is_layer_colour_at_20_percent() {
     let dir = tempfile::tempdir().unwrap();
     for layer in 1..=3u8 {
-        let pad = AgentPad::new(None, dir.path().join("unused"), dir.path().join("unused"));
+        let pad = VibePad::new(None, dir.path().join("unused"), dir.path().join("unused"));
         let mut pad = pad;
         pad.layer = layer;
         let (r, g, b) = daemon::LAYER_COLORS[(layer - 1) as usize];
@@ -267,7 +267,7 @@ fn bottom_row_is_layer_colour_at_20_percent() {
 #[test]
 fn agent_keys_show_status_active_bright_others_dimmed() {
     let dir = tempfile::tempdir().unwrap();
-    let pad = AgentPad::new(None, dir.path().join("unused"), dir.path().join("unused"));
+    let pad = VibePad::new(None, dir.path().join("unused"), dir.path().join("unused"));
     let st = state_with(
         &["a", "b", "c", "d"],
         Some("b"),
@@ -298,7 +298,7 @@ fn agent_keys_show_status_active_bright_others_dimmed() {
 #[test]
 fn blocked_agent_flashes() {
     let dir = tempfile::tempdir().unwrap();
-    let pad = AgentPad::new(None, dir.path().join("unused"), dir.path().join("unused"));
+    let pad = VibePad::new(None, dir.path().join("unused"), dir.path().join("unused"));
     let st = state_with(&["a"], Some("a"), &[("a", "blocked")]);
     assert_eq!(pad.colors(&st, 0.1)[0], daemon::status_color("blocked"));
     assert_eq!(pad.colors(&st, daemon::FLASH + 0.1)[0], daemon::OFF);
@@ -307,7 +307,7 @@ fn blocked_agent_flashes() {
 #[test]
 fn brightness_scales_everything() {
     let dir = tempfile::tempdir().unwrap();
-    let mut pad = AgentPad::new(None, dir.path().join("unused"), dir.path().join("unused"));
+    let mut pad = VibePad::new(None, dir.path().join("unused"), dir.path().join("unused"));
     let st = state_with(&["a"], Some("a"), &[]);
     pad.brightness = 100;
     let full = pad.colors(&st, 0.0);
@@ -347,7 +347,7 @@ fn knob_turn_does_nothing_with_no_agents_or_workspaces() {
             _ => serde_json::json!({}),
         })
     });
-    let mut pad = AgentPad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
+    let mut pad = VibePad::new(None, fake.sock_path.clone(), dir.path().join("unused"));
     press(&mut pad, knob(1, "right"), &fake.sock_path, 0.0); // must not panic
     press(&mut pad, knob(2, "right"), &fake.sock_path, 0.0); // must not panic
 }

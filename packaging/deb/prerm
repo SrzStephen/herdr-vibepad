@@ -1,5 +1,5 @@
 #!/bin/sh
 set -e
 if [ "$1" = remove ]; then
-    systemctl --global disable agentpad.service || true
+    systemctl --global disable herdr-vibepad.service || true
 fi

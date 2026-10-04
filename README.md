@@ -1,10 +1,10 @@
-# agentpad — side keyboard as a herdr controller
+# herdr vibepad — side keyboard as a herdr controller
 
-`agentpad` turns the [SDINNOVATION SIDE-KEYBOARD (USB `6d7d:dcfc`, 16 keys and 3
+herdr vibepad turns the [SDINNOVATION SIDE-KEYBOARD (USB `6d7d:dcfc`, 16 keys and 3
 knobs)](https://link.amazon/B0gofdvCL) into a controller for [herdr](https://herdr.dev) workspaces and agents:
 knobs move between workspaces and agents, keys jump to agents and answer their
 prompts, and the key LEDs show what every agent is doing. It runs as the
-systemd user service `agentpad`.
+systemd user service `herdr-vibepad`.
 
 ![The pad's controls](docs/layout.svg)
 
@@ -68,7 +68,7 @@ or `agent keys: focused workspace`.
 ### Brightness
 
 Turning knob 3 scales every LED in 5% steps between 5% and 100%. The level
-survives restarts (`~/.local/state/agentpad-brightness`). At the lowest levels
+survives restarts (`~/.local/state/herdr-vibepad-brightness`). At the lowest levels
 the dimmest keys (the bottom row, other agents) can look off.
 
 ![Brightness levels](docs/brightness.svg)
@@ -81,7 +81,7 @@ the real pad, and screen colours only approximate the LEDs.
 
 ![How the pieces fit together](docs/architecture.svg)
 
-**Startup.** `agentpad` opens the pad's configuration interface (hidraw,
+**Startup.** `herdr-vibepad` opens the pad's configuration interface (hidraw,
 USB interface 2) and makes sure the pad is set up. Everything below is
 checked every time the daemon starts or the pad is plugged back in. A new or
 factory-reset pad is configured without the vendor's app.
@@ -115,7 +115,7 @@ right and top to bottom:
      0  4  8 12            12 13 14 15
 
 **Talking to herdr.** The daemon sends newline-delimited JSON requests to
-herdr's socket, `~/.config/herdr/herdr.sock` (set `AGENTPAD_HERDR_SOCK` for
+herdr's socket, `~/.config/herdr/herdr.sock` (set `HERDR_VIBEPAD_HERDR_SOCK` for
 another session). It uses these methods:
 
 - `workspace.list` and `agent.list` to read state;
@@ -148,10 +148,10 @@ recipes wrap every command below; run `just` to list them.
 **From a release `.deb`** (Debian/Ubuntu), download it from the GitHub
 release, or build it with `just deb`, then:
 
-    sudo apt install ./agentpad_<version>_amd64.deb
-    systemctl --user daemon-reload && systemctl --user start agentpad
+    sudo apt install ./herdr-vibepad_<version>_amd64.deb
+    systemctl --user daemon-reload && systemctl --user start herdr-vibepad
 
-The package installs the `agentpad`, `side-keyboard-keys` and
+The package installs the `herdr-vibepad`, `side-keyboard-keys` and
 `side-keyboard-led` commands, the udev rule, and a user service that is
 enabled for every user (it starts at login).
 
@@ -161,9 +161,9 @@ enabled for every user (it starts at login).
 
 This needs a Rust toolchain (e.g. via [rustup](https://rustup.rs)) on the machine.
 This builds a release binary (`cargo build --release`) and installs the
-`agentpad`, `side-keyboard-keys` and `side-keyboard-led` commands to
+`herdr-vibepad`, `side-keyboard-keys` and `side-keyboard-led` commands to
 `~/.local/bin`, installs the udev rule to `/etc/udev/rules.d` (uses sudo), and
-writes, enables and starts `~/.config/systemd/user/agentpad.service`. There's
+writes, enables and starts `~/.config/systemd/user/herdr-vibepad.service`. There's
 no editable install, so after changing the code, run `just install` again
 (not just `just restart`) to pick it up. `just uninstall` undoes it.
 
@@ -173,7 +173,7 @@ no editable install, so after changing the code, run `just install` again
     just check       # cargo clippy + cargo fmt --check + shellcheck, then cargo test
     just fmt         # format and apply safe lint fixes
     just diagrams    # regenerate docs/*.svg from the daemon's layout and colours
-    just deb         # build dist/agentpad_<version>_amd64.deb
+    just deb         # build dist/herdr-vibepad_<version>_amd64.deb
     just deb-test    # also install it in a clean ubuntu:24.04 container and smoke-test it (docker)
     just logs        # follow the service log
 
@@ -182,7 +182,7 @@ socket, and the key-decoding tests replay HID reports captured from the pad.
 
 Code lives in `src/`: `daemon.rs` is the service, `keys.rs` and `led.rs` speak
 the pad's config protocol, `hid.rs` wraps the raw device I/O, and `herdr.rs`
-is the herdr socket client. `src/bin/` has the four binaries: `agentpad` (the
+is the herdr socket client. `src/bin/` has the four binaries: `herdr-vibepad` (the
 daemon), `side-keyboard-keys` and `side-keyboard-led` (thin CLIs over
 `keys.rs` and `led.rs`), and `diagrams` (dev-only, regenerates the README's
 SVGs). Tunables are constants near the top of `daemon.rs`: `BOTTOM_KEYS`,
@@ -242,7 +242,7 @@ restart. Leave it open, or start it at logon with Task Scheduler.
 
     lsusb | grep 6d7d                              # pad attached
     ls -l /dev/hidraw*                             # its nodes, group plugdev
-    journalctl --user -u agentpad -f               # should say "pad ready"
+    journalctl --user -u herdr-vibepad -f               # should say "pad ready"
 
 If the pad is in `lsusb` but has no `/dev/hidraw*` nodes, load the drivers
 with `sudo modprobe usbhid hid_generic evdev`. To load them at every boot, run
@@ -253,7 +253,7 @@ keys away from a Linux desktop.
 
 ## Undo
 
-    just uninstall                                   # or: sudo apt remove agentpad
+    just uninstall                                   # or: sudo apt remove herdr-vibepad
     side-keyboard-keys restore --profile 5           # the pad's original profile-5 mapping
     side-keyboard-keys profile 4                     # the profile that was active before
     side-keyboard-led raw 01 00 01 04 04 00 01 ff aa ff ff   # previous solid-blue lighting

@@ -1,4 +1,4 @@
-//! CLI binary for `agentpad::keys` — see `USAGE` below (byte-identical to
+//! CLI binary for `herdr_vibepad::keys` — see `USAGE` below (byte-identical to
 //! `src/agentpad/keys.py`'s module docstring).
 
 use std::fs;
@@ -6,7 +6,7 @@ use std::os::fd::AsRawFd;
 use std::os::unix::io::RawFd;
 use std::process::ExitCode;
 
-use agentpad::keys;
+use herdr_vibepad::keys;
 use nix::fcntl::{open, OFlag};
 use nix::sys::stat::Mode;
 

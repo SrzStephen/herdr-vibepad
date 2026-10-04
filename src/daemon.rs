@@ -1,7 +1,7 @@
 //! Drive herdr workspaces and agents from the SDINNOVATION SIDE-KEYBOARD (6d7d:dcfc).
 //!
 //! Ported from `src/agentpad/daemon.py`. Holds key/LED position mapping, the
-//! `Pad` hardware handle, `State` (herdr's snapshot) and `AgentPad`, the
+//! `Pad` hardware handle, `State` (herdr's snapshot) and `VibePad`, the
 //! key-handling behaviour and event loop.
 
 use std::collections::HashMap;
@@ -485,7 +485,7 @@ pub const TRIPLE_PRESS_WINDOW: f64 = 1.0;
 pub const BRIGHTNESS_STEP: i32 = 5;
 /// So the pad never looks switched off.
 pub const BRIGHTNESS_MIN: i32 = 5;
-/// Seconds between herdr state polls in [`AgentPad::run`].
+/// Seconds between herdr state polls in [`VibePad::run`].
 const POLL: f64 = 0.25;
 
 /// herdr `agent_status` -> colour; anything else (including no status at
@@ -559,7 +559,7 @@ fn save_brightness(path: &Path, pct: i32) {
 
 /// The pad's key-handling behaviour: layer, brightness, all-workspaces mode,
 /// and translating pad slots/herdr state into herdr calls and LED colours.
-pub struct AgentPad {
+pub struct VibePad {
     pub layer: u8,
     pub brightness: i32,
     /// Agent keys cover every workspace, not just the focused one.
@@ -570,10 +570,10 @@ pub struct AgentPad {
     brightness_file: PathBuf,
 }
 
-impl AgentPad {
-    pub fn new(pad: Option<Pad>, sock_path: PathBuf, brightness_file: PathBuf) -> AgentPad {
+impl VibePad {
+    pub fn new(pad: Option<Pad>, sock_path: PathBuf, brightness_file: PathBuf) -> VibePad {
         let brightness = load_brightness(&brightness_file);
-        AgentPad {
+        VibePad {
             layer: 1,
             brightness,
             all_workspaces: false,

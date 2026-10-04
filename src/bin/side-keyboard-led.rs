@@ -1,4 +1,4 @@
-//! CLI binary for `agentpad::led` — see `USAGE` below (byte-identical to
+//! CLI binary for `herdr_vibepad::led` — see `USAGE` below (byte-identical to
 //! `src/agentpad/led.py`'s module docstring).
 
 use std::os::fd::AsRawFd;
@@ -7,7 +7,7 @@ use std::process::ExitCode;
 use std::thread;
 use std::time::Duration;
 
-use agentpad::led;
+use herdr_vibepad::led;
 use nix::fcntl::{open, OFlag};
 use nix::sys::stat::Mode;
 
@@ -78,7 +78,7 @@ fn run(fd: RawFd, cmd: &str, args: &[String], cur: [u8; 11]) -> Result<(), Strin
             }
             let mut payload = vec![0x06, 0x0B, vals.len() as u8, 0x00, 0x00];
             payload.extend_from_slice(&vals);
-            agentpad::hid::send(fd, &payload).map_err(|e| e.to_string())
+            herdr_vibepad::hid::send(fd, &payload).map_err(|e| e.to_string())
         }
         "set" => {
             if args.is_empty() {

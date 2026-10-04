@@ -4,7 +4,7 @@ use std::path::Path;
 #[test]
 fn returns_the_result_field_on_success() {
     let fake = support::FakeHerdr::start(|_method, _params| Ok(serde_json::json!({"ok": true})));
-    let result = agentpad::herdr::call(&fake.sock_path, "ping", serde_json::json!({}));
+    let result = herdr_vibepad::herdr::call(&fake.sock_path, "ping", serde_json::json!({}));
     assert_eq!(result, Some(serde_json::json!({"ok": true})));
 }
 
@@ -13,14 +13,14 @@ fn returns_none_on_an_error_reply() {
     let fake =
         support::FakeHerdr::start(|_method, _params| Err(serde_json::json!({"message": "boom"})));
     assert_eq!(
-        agentpad::herdr::call(&fake.sock_path, "ping", serde_json::json!({})),
+        herdr_vibepad::herdr::call(&fake.sock_path, "ping", serde_json::json!({})),
         None
     );
 }
 
 #[test]
 fn returns_none_when_nothing_is_listening() {
-    let result = agentpad::herdr::call(
+    let result = herdr_vibepad::herdr::call(
         Path::new("/nonexistent/herdr.sock"),
         "ping",
         serde_json::json!({}),
@@ -56,7 +56,7 @@ fn returns_none_on_malformed_json_reply() {
         let _ = s.write_all(b"{not json\n");
     });
     assert_eq!(
-        agentpad::herdr::call(&path, "ping", serde_json::json!({})),
+        herdr_vibepad::herdr::call(&path, "ping", serde_json::json!({})),
         None
     );
 }
@@ -67,7 +67,7 @@ fn returns_none_when_server_closes_without_replying() {
         drain_request(&s);
     });
     assert_eq!(
-        agentpad::herdr::call(&path, "ping", serde_json::json!({})),
+        herdr_vibepad::herdr::call(&path, "ping", serde_json::json!({})),
         None
     );
 }
@@ -80,7 +80,7 @@ fn returns_none_on_a_non_object_reply() {
         let _ = s.write_all(b"[]\n");
     });
     assert_eq!(
-        agentpad::herdr::call(&path, "ping", serde_json::json!({})),
+        herdr_vibepad::herdr::call(&path, "ping", serde_json::json!({})),
         None
     );
 }
@@ -93,7 +93,7 @@ fn returns_none_within_the_timeout_when_server_never_replies() {
     });
     let start = std::time::Instant::now();
     assert_eq!(
-        agentpad::herdr::call(&path, "ping", serde_json::json!({})),
+        herdr_vibepad::herdr::call(&path, "ping", serde_json::json!({})),
         None
     );
     assert!(start.elapsed() < std::time::Duration::from_secs(5));

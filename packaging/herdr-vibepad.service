@@ -3,7 +3,7 @@ Description=SDINNOVATION SIDE-KEYBOARD as a herdr controller
 After=graphical-session.target
 
 [Service]
-ExecStart=/usr/bin/agentpad
+ExecStart=/usr/bin/herdr-vibepad
 Restart=always
 RestartSec=2
 

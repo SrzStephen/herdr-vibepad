@@ -41,7 +41,7 @@ impl FakeHerdr {
             + 'static,
     {
         let tempdir = tempfile::Builder::new()
-            .prefix("agentpad-")
+            .prefix("herdr-vibepad-")
             .tempdir()
             .expect("create tempdir for fake herdr socket");
         let sock_path = tempdir.path().join("herdr.sock");
@@ -115,7 +115,7 @@ struct TwoWorkspaceState {
     focused: HashMap<String, String>,
 }
 
-/// Just enough of herdr's socket API to drive `AgentPad`: two workspaces,
+/// Just enough of herdr's socket API to drive `VibePad`: two workspaces,
 /// agents, focus, send_keys. Ports `tests/conftest.py`'s `FakeHerdr` class.
 pub fn two_workspace_herdr() -> FakeHerdr {
     let state = Arc::new(Mutex::new(TwoWorkspaceState {
