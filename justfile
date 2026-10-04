@@ -10,7 +10,7 @@ user_unit := env("HOME") / ".config/systemd/user/agentpad.service"
 default:
     @just --list
 
-# Create .venv with the dev tools (pytest, ruff)
+# Fetch Cargo dependencies
 sync:
     cargo fetch
 
@@ -74,7 +74,7 @@ uninstall:
     rm -f {{ user_unit }}
     systemctl --user daemon-reload
     sudo rm -f {{ udev_rule }}
-    -uv tool uninstall agentpad
+    rm -f {{ bin_dir }}/agentpad {{ bin_dir }}/side-keyboard-keys {{ bin_dir }}/side-keyboard-led
 
 # Follow the service log
 logs:
