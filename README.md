@@ -1,7 +1,7 @@
 # agentpad — side keyboard as a herdr controller
 
-`agentpad` turns the SDINNOVATION SIDE-KEYBOARD (USB `6d7d:dcfc`, 16 keys and 3
-knobs) into a controller for [herdr](https://herdr.dev) workspaces and agents:
+`agentpad` turns the [SDINNOVATION SIDE-KEYBOARD (USB `6d7d:dcfc`, 16 keys and 3
+knobs)](https://link.amazon/B0gofdvCL) into a controller for [herdr](https://herdr.dev) workspaces and agents:
 knobs move between workspaces and agents, keys jump to agents and answer their
 prompts, and the key LEDs show what every agent is doing. It runs as the
 systemd user service `agentpad`.
