@@ -6,6 +6,7 @@
 
 #![allow(dead_code)]
 
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixListener;
 use std::path::PathBuf;
@@ -103,4 +104,83 @@ impl FakeHerdr {
     pub fn calls(&self) -> Vec<(String, serde_json::Value)> {
         self.calls.lock().expect("calls lock poisoned").clone()
     }
+}
+
+/// Internal state of [`two_workspace_herdr`]'s fake: two workspaces (`w1`
+/// with panes p1-p3, `w2` with pane p1), which workspace is focused, and
+/// which pane is focused within each workspace.
+struct TwoWorkspaceState {
+    panes: Vec<(&'static str, Vec<&'static str>)>,
+    workspace: String,
+    focused: HashMap<String, String>,
+}
+
+/// Just enough of herdr's socket API to drive `AgentPad`: two workspaces,
+/// agents, focus, send_keys. Ports `tests/conftest.py`'s `FakeHerdr` class.
+pub fn two_workspace_herdr() -> FakeHerdr {
+    let state = Arc::new(Mutex::new(TwoWorkspaceState {
+        panes: vec![
+            ("w1", vec!["w1:p1", "w1:p2", "w1:p3"]),
+            ("w2", vec!["w2:p1"]),
+        ],
+        workspace: "w1".to_string(),
+        focused: HashMap::from([
+            ("w1".to_string(), "w1:p1".to_string()),
+            ("w2".to_string(), "w2:p1".to_string()),
+        ]),
+    }));
+
+    FakeHerdr::start(move |method, params| {
+        let mut st = state.lock().expect("fake herdr state lock poisoned");
+        match method {
+            "workspace.list" => {
+                let workspaces: Vec<serde_json::Value> = st
+                    .panes
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (w, _))| {
+                        serde_json::json!({
+                            "workspace_id": w,
+                            "number": i + 1,
+                            "focused": *w == st.workspace,
+                        })
+                    })
+                    .collect();
+                Ok(serde_json::json!({"workspaces": workspaces}))
+            }
+            "agent.list" => {
+                let mut agents = Vec::new();
+                for (w, panes) in &st.panes {
+                    for p in panes {
+                        let focused = *w == st.workspace
+                            && st.focused.get(*w).map(String::as_str) == Some(*p);
+                        agents.push(serde_json::json!({
+                            "pane_id": p,
+                            "workspace_id": w,
+                            "tab_id": format!("{w}:t1"),
+                            "focused": focused,
+                            "agent_status": "idle",
+                        }));
+                    }
+                }
+                Ok(serde_json::json!({"agents": agents}))
+            }
+            "workspace.focus" => {
+                if let Some(wid) = params.get("workspace_id").and_then(|v| v.as_str()) {
+                    st.workspace = wid.to_string();
+                }
+                Ok(serde_json::json!({}))
+            }
+            "agent.focus" => {
+                if let Some(target) = params.get("target").and_then(|v| v.as_str()) {
+                    let ws = target.split(':').next().unwrap_or("").to_string();
+                    st.focused.insert(ws.clone(), target.to_string());
+                    st.workspace = ws;
+                }
+                Ok(serde_json::json!({}))
+            }
+            "pane.send_keys" => Ok(serde_json::json!({})),
+            other => Err(serde_json::json!({"code": "unknown_method", "message": other})),
+        }
+    })
 }

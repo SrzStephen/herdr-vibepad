@@ -447,6 +447,344 @@ impl Drop for Pad {
     }
 }
 
+// ---------------------------------------------------------------- behaviour
+
+use std::path::PathBuf;
+use std::time::Instant;
+
+pub const AGENT_KEYS: usize = 12;
+/// layer -> herdr key names for keys 12-15, `None` = unmapped.
+pub const BOTTOM_KEYS: [[Option<&str>; 4]; 3] = [
+    [Some("1"), Some("2"), Some("3"), Some("esc")],
+    [Some("1"), Some("2"), Some("3"), Some("esc")],
+    [Some("y"), Some("n"), Some("t"), Some("esc")],
+];
+pub const LAYER_COLORS: [(u8, u8, u8); 3] = [(255, 50, 0), (0, 60, 255), (150, 0, 255)];
+/// The agent each layer's keys suit.
+pub const LAYER_NAMES: [&str; 3] = ["Claude", "Codex", "Kiro"];
+/// Bottom row, as a fraction of the layer colour.
+pub const BOTTOM_BRIGHTNESS: f64 = 0.2;
+pub const OFF: (u8, u8, u8) = (0, 0, 0);
+/// Agents other than the active one are this many times dimmer.
+pub const INACTIVE_DIM: u32 = 5;
+/// Seconds per on/off half of the blocked flash.
+pub const FLASH: f64 = 0.5;
+/// Knob 1 presses that toggle all-workspaces mode...
+pub const TRIPLE_PRESS: usize = 3;
+/// ...within this many seconds.
+pub const TRIPLE_PRESS_WINDOW: f64 = 1.0;
+/// Knob 3: percentage points per click.
+pub const BRIGHTNESS_STEP: i32 = 5;
+/// So the pad never looks switched off.
+pub const BRIGHTNESS_MIN: i32 = 5;
+/// Seconds between herdr state polls in [`AgentPad::run`].
+const POLL: f64 = 0.25;
+
+/// herdr `agent_status` -> colour; anything else (including no status at
+/// all) shows as idle.
+pub fn status_color(status: &str) -> (u8, u8, u8) {
+    match status {
+        "working" => (255, 160, 0),
+        "blocked" => (255, 0, 0), // waiting on an approval or question; flashes
+        "done" => (0, 255, 0),    // finished and not yet looked at
+        _ => (255, 255, 255),     // idle, and anything unrecognized
+    }
+}
+
+/// Python's `round()`: round-half-to-even. `f64::round()` rounds half away
+/// from zero instead, which only differs from Python at an exact `.5` tie
+/// (and even then only when the integer part below the tie is odd), so only
+/// that case needs special handling.
+pub fn round_half_even(x: f64) -> i64 {
+    let floor = x.floor();
+    if x - floor == 0.5 {
+        let floor_i = floor as i64;
+        if floor_i % 2 == 0 {
+            floor_i
+        } else {
+            floor_i + 1
+        }
+    } else {
+        x.round() as i64
+    }
+}
+
+/// `items[index_of(current) + delta]`, wrapping; `items[0]`/`items[-1]` if
+/// `current` isn't in `items` (stepping right/left respectively); `None` if
+/// `items` is empty.
+fn step<T: PartialEq + Clone>(items: &[T], current: Option<&T>, delta: i64) -> Option<T> {
+    if items.is_empty() {
+        return None;
+    }
+    match current.and_then(|c| items.iter().position(|i| i == c)) {
+        None => Some(if delta > 0 {
+            items[0].clone()
+        } else {
+            items[items.len() - 1].clone()
+        }),
+        Some(idx) => {
+            let len = items.len() as i64;
+            let new_idx = (idx as i64 + delta).rem_euclid(len) as usize;
+            Some(items[new_idx].clone())
+        }
+    }
+}
+
+fn load_brightness(path: &Path) -> i32 {
+    match std::fs::read_to_string(path) {
+        Ok(s) => match s.trim().parse::<i32>() {
+            Ok(n) => n.clamp(BRIGHTNESS_MIN, 100),
+            Err(_) => 100,
+        },
+        Err(_) => 100,
+    }
+}
+
+fn save_brightness(path: &Path, pct: i32) {
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Err(e) = std::fs::write(path, format!("{pct}\n")) {
+        crate::log(&format!("can't save brightness: {e}"), false);
+    }
+}
+
+/// The pad's key-handling behaviour: layer, brightness, all-workspaces mode,
+/// and translating pad slots/herdr state into herdr calls and LED colours.
+pub struct AgentPad {
+    pub layer: u8,
+    pub brightness: i32,
+    /// Agent keys cover every workspace, not just the focused one.
+    pub all_workspaces: bool,
+    pub knob1_presses: Vec<f64>,
+    pad: Option<Pad>,
+    sock_path: PathBuf,
+    brightness_file: PathBuf,
+}
+
+impl AgentPad {
+    pub fn new(pad: Option<Pad>, sock_path: PathBuf, brightness_file: PathBuf) -> AgentPad {
+        let brightness = load_brightness(&brightness_file);
+        AgentPad {
+            layer: 1,
+            brightness,
+            all_workspaces: false,
+            knob1_presses: Vec::new(),
+            pad,
+            sock_path,
+            brightness_file,
+        }
+    }
+
+    /// The agents the top three rows stand for, in key order.
+    fn keyed_agents<'a>(&self, st: &'a State) -> &'a [String] {
+        if self.all_workspaces {
+            &st.all_agents
+        } else {
+            &st.agents
+        }
+    }
+
+    pub fn press(&mut self, slot: usize, st: &State, now: f64) {
+        if slot < keys::NUM_KEYS {
+            let pos = position(slot);
+            crate::log(
+                &format!("key row {} column {}", pos / 4 + 1, pos % 4 + 1),
+                false,
+            );
+            self.key(pos, st);
+        } else {
+            let rel = slot - keys::NUM_KEYS;
+            let (knob, part) = (rel / 3, rel % 3);
+            self.knob((knob + 1) as u8, keys::KNOB_PARTS[part], st, now);
+        }
+    }
+
+    /// `pos`: physical key position, left to right, top to bottom.
+    fn key(&mut self, pos: usize, st: &State) {
+        if pos < AGENT_KEYS {
+            let agents = self.keyed_agents(st);
+            if let Some(agent) = agents.get(pos) {
+                // Also focuses its workspace.
+                herdr::call(
+                    &self.sock_path,
+                    "agent.focus",
+                    serde_json::json!({"target": agent}),
+                );
+            }
+        } else if let Some(key) = BOTTOM_KEYS[(self.layer - 1) as usize][pos - AGENT_KEYS] {
+            if let Some(active) = &st.active {
+                // agent.send_keys only takes named agents; the pane works for any.
+                herdr::call(
+                    &self.sock_path,
+                    "pane.send_keys",
+                    serde_json::json!({"pane_id": active, "keys": [key]}),
+                );
+            }
+        }
+    }
+
+    fn knob(&mut self, n: u8, action: &str, st: &State, now: f64) {
+        if action == "press" {
+            self.layer = n;
+            crate::log(
+                &format!(
+                    "layer {} ({} mode)",
+                    self.layer,
+                    LAYER_NAMES[(self.layer - 1) as usize]
+                ),
+                false,
+            );
+            if n == 1 {
+                self.count_knob1_press(now);
+            }
+            return;
+        }
+        let delta: i64 = if action == "right" { 1 } else { -1 };
+        match n {
+            1 => {
+                let ids: Vec<&str> = st
+                    .workspaces
+                    .iter()
+                    .map(|w| w.workspace_id.as_str())
+                    .collect();
+                if let Some(target) = step(&ids, st.workspace.as_deref().as_ref(), delta) {
+                    if Some(target) != st.workspace.as_deref() {
+                        herdr::call(
+                            &self.sock_path,
+                            "workspace.focus",
+                            serde_json::json!({"workspace_id": target}),
+                        );
+                    }
+                }
+            }
+            2 => {
+                let ids: Vec<&str> = st.agents.iter().map(|s| s.as_str()).collect();
+                if let Some(target) = step(&ids, st.active.as_deref().as_ref(), delta) {
+                    if Some(target) != st.active.as_deref() {
+                        herdr::call(
+                            &self.sock_path,
+                            "agent.focus",
+                            serde_json::json!({"target": target}),
+                        );
+                    }
+                }
+            }
+            3 => {
+                let step_pct = if action == "right" {
+                    BRIGHTNESS_STEP
+                } else {
+                    -BRIGHTNESS_STEP
+                };
+                let brightness = (self.brightness + step_pct).clamp(BRIGHTNESS_MIN, 100);
+                if brightness != self.brightness {
+                    self.brightness = brightness;
+                    save_brightness(&self.brightness_file, brightness);
+                    crate::log(&format!("brightness {brightness}%"), false);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Pressing knob 1 [`TRIPLE_PRESS`] times within [`TRIPLE_PRESS_WINDOW`]
+    /// toggles all-workspaces mode.
+    fn count_knob1_press(&mut self, now: f64) {
+        self.knob1_presses
+            .retain(|&t| now - t < TRIPLE_PRESS_WINDOW);
+        self.knob1_presses.push(now);
+        if self.knob1_presses.len() >= TRIPLE_PRESS {
+            self.knob1_presses.clear();
+            self.all_workspaces = !self.all_workspaces;
+            crate::log(
+                &format!(
+                    "agent keys: {}",
+                    if self.all_workspaces {
+                        "all workspaces"
+                    } else {
+                        "focused workspace"
+                    }
+                ),
+                false,
+            );
+        }
+    }
+
+    pub fn colors(&self, st: &State, now: f64) -> [(u8, u8, u8); 16] {
+        let layer = LAYER_COLORS[(self.layer - 1) as usize];
+        let flash_on = (now / FLASH) as i64 % 2 == 0;
+        let agents = self.keyed_agents(st);
+        let mut out = [OFF; 16];
+        for (k, slot) in out.iter_mut().enumerate().take(keys::NUM_KEYS) {
+            if k < AGENT_KEYS {
+                let agent = agents.get(k).map(String::as_str);
+                let status = agent.and_then(|a| st.status.get(a)).map(String::as_str);
+                if agent.is_none() || (status == Some("blocked") && !flash_on) {
+                    *slot = OFF;
+                    continue;
+                }
+                let rgb = status_color(status.unwrap_or("idle"));
+                *slot = if agent == st.active.as_deref() {
+                    rgb
+                } else {
+                    (
+                        (rgb.0 as u32 / INACTIVE_DIM) as u8,
+                        (rgb.1 as u32 / INACTIVE_DIM) as u8,
+                        (rgb.2 as u32 / INACTIVE_DIM) as u8,
+                    )
+                };
+            } else {
+                *slot = (
+                    round_half_even(layer.0 as f64 * BOTTOM_BRIGHTNESS) as u8,
+                    round_half_even(layer.1 as f64 * BOTTOM_BRIGHTNESS) as u8,
+                    round_half_even(layer.2 as f64 * BOTTOM_BRIGHTNESS) as u8,
+                );
+            }
+        }
+        let scale = |c: u8| round_half_even(c as f64 * self.brightness as f64 / 100.0) as u8;
+        out.map(|(r, g, b)| (scale(r), scale(g), scale(b)))
+    }
+
+    /// The pad's hardware event loop: fetch [`State`], show colours, wait
+    /// for events, re-press, re-fetch, redraw.
+    pub fn run(&mut self) -> Result<(), PadGone> {
+        if self.pad.is_none() {
+            return Err(PadGone("no pad".to_string()));
+        }
+        let start = Instant::now();
+        let now = || start.elapsed().as_secs_f64();
+
+        let mut st = State::fetch(&self.sock_path);
+        let frame = to_frame(&self.colors(&st, now()));
+        self.pad.as_mut().expect("checked above").show(&frame);
+
+        let mut next_poll = now() + POLL;
+        loop {
+            let remaining = (next_poll - now()).max(0.0);
+            let slots = self
+                .pad
+                .as_mut()
+                .expect("checked above")
+                .events(Duration::from_secs_f64(remaining))?;
+            for &slot in &slots {
+                let n = now();
+                self.press(slot, &st, n);
+                st = State::fetch(&self.sock_path);
+            }
+            if slots.is_empty() {
+                st = State::fetch(&self.sock_path);
+                next_poll = now() + POLL;
+            }
+            let frame = to_frame(&self.colors(&st, now()));
+            self.pad.as_mut().expect("checked above").show(&frame);
+        }
+    }
+}
+
+fn to_frame(colors: &[(u8, u8, u8); 16]) -> [[u8; 3]; 16] {
+    colors.map(|(r, g, b)| [r, g, b])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
