@@ -90,4 +90,4 @@ status:
 
 # Remove build output and caches
 clean:
-    rm -rf build dist .pytest_cache .ruff_cache
+    rm -rf dist target
