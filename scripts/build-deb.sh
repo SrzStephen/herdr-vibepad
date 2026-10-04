@@ -1,5 +1,5 @@
 #!/bin/sh
-# Build dist/agentpad_<version>_all.deb from this checkout (version from pyproject.toml).
+# Build dist/agentpad_<version>_amd64.deb from this checkout (version from Cargo.toml).
 set -eu
 umask 022
 cd "$(dirname "$0")/.."
@@ -22,4 +22,4 @@ sed -e "s/@VERSION@/$version/" -e "s/@SIZE@/$size/" packaging/deb/control > "$ro
 install -m 755 packaging/deb/postinst packaging/deb/prerm "$root/DEBIAN/"
 
 mkdir -p dist
-dpkg-deb --root-owner-group --build "$root" "dist/agentpad_${version}_all.deb"
+dpkg-deb --root-owner-group --build "$root" "dist/agentpad_${version}_amd64.deb"
