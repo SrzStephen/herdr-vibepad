@@ -73,6 +73,15 @@ pub fn find_input_event_nodes(vendor_hex: &str, product_hex: &str) -> Vec<PathBu
 /// Send one unnumbered 64-byte HID report, `payload` left-padded to 64 bytes
 /// with zeros and prefixed with the leading `0x00` report-number byte.
 pub fn send(fd: RawFd, payload: &[u8]) -> io::Result<()> {
+    if payload.len() > 64 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "payload of {} bytes exceeds the 64-byte HID report size",
+                payload.len()
+            ),
+        ));
+    }
     let mut frame = [0u8; 65];
     frame[1..1 + payload.len()].copy_from_slice(payload);
     let borrowed = unsafe { BorrowedFd::borrow_raw(fd) };
@@ -104,5 +113,20 @@ pub fn request(
         if is_reply(r) {
             return Ok(r.to_vec());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::fd::AsRawFd;
+
+    #[test]
+    fn send_rejects_oversized_payload_instead_of_panicking() {
+        let (_read_end, write_end) = nix::unistd::pipe().expect("pipe");
+        let fd = write_end.as_raw_fd();
+        let payload = [0u8; 65];
+        let err = send(fd, &payload).expect_err("65-byte payload must be rejected");
+        assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
     }
 }
